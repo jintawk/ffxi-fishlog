@@ -12,23 +12,7 @@ FishLog only watches, it never casts or reels for you, so it's safe to run wheth
 
 ## What you see
 
-```
-» FISHLOG                    Bastok Markets
-skill 8 +0.4          moon 67%  0:42:13
-──────────────────────────────────────────
-21:03:12 + crayfish  (9s)
-21:03:44 + moat carp x3  (14s)
-21:04:20 - no bite
-21:05:02 » rusty bucket  (11s)
-21:05:30 ! line snapped!
-21:06:02 * fishing skill +0.1
-21:06:40 M MONSTER on the line!
-──────────────────────────────────────────
-» on line: crayfish  (small)
-──────────────────────────────────────────
-casts 42  catch 28 (67%)  fish/hr 41
-skill +0.4  breaks 2  today 37/200
-```
+![The FishLog window](screenshot.png)
 
 - **History**: every catch, miss, lost catch, break, skill-up, and monster, each with a timestamp. Catches show how long the fight lasted.
 - **On the line**: when something bites, FishLog names it before you land it, so you know whether it's the fish you want or a piece of junk.
