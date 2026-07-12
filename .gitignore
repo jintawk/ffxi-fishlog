@@ -1,0 +1,9 @@
+# Per-character settings and anything the addon generates at runtime.
+# These are recreated automatically on load, so they never belong in git.
+data/
+
+# Editor / OS noise
+*.swp
+*~
+.DS_Store
+Thumbs.db
