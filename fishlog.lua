@@ -20,7 +20,7 @@ GNU General Public License for more details.
 
 _addon.name = 'FishLog'
 _addon.author = 'Jintawk'
-_addon.version = '1.3.1'
+_addon.version = '1.4.1'
 _addon.commands = {'fishlog', 'fl'}
 
 local bit = require('bit')
@@ -181,6 +181,18 @@ local function play(name)
     windower.play_sound(windower.addon_path .. 'sounds/' .. name .. '.wav')
 end
 
+-- Fishing skill level of a fish by its catch name (data.fish_levels). The catch
+-- name is pluralised on a multi-catch ("3 bastore sardines"), so on a miss we
+-- retry without a trailing 's'. Returns the level string ("96", "56-58",
+-- "110+") or nil when the fish isn't in the table.
+local function fish_level(name)
+    if not name then return nil end
+    name = name:lower():match('^%s*(.-)%s*$')
+    return data.fish_levels[name]
+        or (name:sub(-1) == 's' and data.fish_levels[name:sub(1, -2)])
+        or nil
+end
+
 -------------------------------------------------------------------------------
 -- Tracked catches
 -------------------------------------------------------------------------------
@@ -237,7 +249,29 @@ local finalized_row   -- a cast whose outcome is known but whose write is held
 local CSV_HEADER = 'v,contributor,utc,zone_id,zone,skill,rod_id,rod,bait_id,bait,'
     .. 'moon,moon_phase,vana_min,vana_day,weather_id,outcome,bite_id,'
     .. 'p1,p2,p3,p4,p5,p6,p7,p8,p9,identified,caught,count,fight_s,x,y,z,facing,'
-    .. 'skillup'
+    .. 'skillup,fish_level,buffs,gear,key_items'
+
+-- equipped slots worth logging as "fishing support" - everything the player can
+-- wear that isn't the rod (range) or bait (ammo), which already have their own
+-- columns. Captures the fisherman's belt (waist), gloves (hands), etc.
+local GEAR_SLOTS = {'head', 'neck', 'ear1', 'ear2', 'body', 'hands',
+                    'ring1', 'ring2', 'back', 'waist', 'legs', 'feet'}
+
+-- fishing-relevant key items (ids from res/key_items). The Moghancement /
+-- Moglification tiers are the active Mog House effect; the rest are the fishing
+-- abilities and the skill-handling KI. Mog Garden fishing books and the Abyssea
+-- angler atma are left out - they only affect Mog Garden / Abyssea fishing.
+local FISH_KEY_ITEMS = {
+    [523] = true, [534] = true,     -- Moghancement: Fishing
+    [544] = true,                   -- Moglification: Fishing
+    [553] = true,                   -- Mega Moglification: Fishing
+    [1976] = true,                  -- Frog Fishing
+    [1977] = true,                  -- Serpent Rumors
+    [1978] = true,                  -- Mooching
+    [1979] = true,                  -- Anglers' Almanac
+    [2040] = true,                  -- Raw Fish Handling
+    [2735] = true,                  -- Cheer: Baby Eft (Monster Rearing, Fishing skill +%)
+}
 
 -- stable anonymous contributor id (djb2 hash of character name)
 local function anon_id(name)
@@ -267,15 +301,19 @@ local function write_cast_row(row)
                           'vana_min', 'vana_day', 'weather_id', 'outcome', 'bite_id',
                           'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9',
                           'identified', 'caught', 'count', 'fight_s',
-                          'x', 'y', 'z', 'facing', 'skillup'}) do
+                          'x', 'y', 'z', 'facing', 'skillup', 'fish_level',
+                          'buffs', 'gear', 'key_items'}) do
         fields[i] = csv_field(row[key])
     end
     f:write(table.concat(fields, ',') .. '\n')
     f:close()
 end
 
+-- forward-declared here so open_cast_row can reference it; defined below
+local get_equipped_item_id
+
 -- called at cast start: snapshot everything that could influence the bite
-local function open_cast_row(rod_id, bait_id)
+local function open_cast_row(rod_id, bait_id, items)
     if not settings.research then return end
     local info = windower.ffxi.get_info()
     local player = windower.ffxi.get_player()
@@ -286,8 +324,44 @@ local function open_cast_row(rod_id, bait_id)
     local skill_val = (settings.known_skill and settings.known_skill > 0)
         and settings.known_skill
         or (player.skills and player.skills.fishing) or ''
+    -- active status effects (empty buff slots are padded with 255); "Food" is
+    -- the fishing-relevant one, but log them all so any support buff is captured
+    local buffs = {}
+    if player.buffs then
+        for _, id in ipairs(player.buffs) do
+            if id and id ~= 255 and id ~= 0 and res.buffs[id] then
+                buffs[#buffs + 1] = res.buffs[id].en
+            end
+        end
+    end
+    -- equipped support gear (rod/bait already have their own columns), recorded
+    -- as "slot:Name" so the fisherman's belt etc. are readable at a glance
+    local gear = {}
+    if items then
+        for _, slot in ipairs(GEAR_SLOTS) do
+            local id = get_equipped_item_id(slot, items)
+            if id and res.items[id] then
+                gear[#gear + 1] = slot .. ':' .. res.items[id].en
+            end
+        end
+    end
+    -- fishing-relevant key items the player holds; dedupe by name, since the two
+    -- Moghancement ids share a name
+    local kis, ki_seen = {}, {}
+    local ok_ki, ki_list = pcall(windower.ffxi.get_key_items)
+    if ok_ki and ki_list then
+        for _, id in ipairs(ki_list) do
+            if FISH_KEY_ITEMS[id] and res.key_items[id] then
+                local nm = res.key_items[id].en
+                if not ki_seen[nm] then
+                    ki_seen[nm] = true
+                    kis[#kis + 1] = nm
+                end
+            end
+        end
+    end
     pending_row = {
-        v = 3,
+        v = 4,
         contributor = anon_id(char_name or 'unknown'),
         utc = os.date('!%Y-%m-%dT%H:%M:%SZ'),
         zone_id = info.zone,
@@ -306,6 +380,9 @@ local function open_cast_row(rod_id, bait_id)
         y = me and me.y or '',
         z = me and me.z or '',
         facing = me and me.facing or '',
+        buffs = table.concat(buffs, ';'),
+        gear = table.concat(gear, ';'),
+        key_items = table.concat(kis, ';'),
     }
 end
 
@@ -317,7 +394,7 @@ local function flush_row()
     end
 end
 
-local function finish_cast_row(outcome, caught, count, fight_s)
+local function finish_cast_row(outcome, caught, count, fight_s, fish_lvl)
     if not pending_row then return end
     -- a previous cast may still be buffered awaiting its skill-up window; flush
     -- it before we start holding a new one so rows never overlap
@@ -326,6 +403,7 @@ local function finish_cast_row(outcome, caught, count, fight_s)
     pending_row.caught = caught
     pending_row.count = count
     pending_row.fight_s = fight_s
+    pending_row.fish_level = fish_lvl
     pending_row._t = os.time()   -- for the grace-flush timer (not a CSV column)
     finalized_row = pending_row
     pending_row = nil
@@ -359,7 +437,6 @@ end
 -- Hooked-item identification (ported from fisher by Seth VanHeulen)
 -------------------------------------------------------------------------------
 
-local get_equipped_item_id
 do
     local bag_by_id = {
         [0] = 'inventory',
@@ -768,18 +845,20 @@ local function on_catch(name, n)
             fight_s = dur
         end
     end
-    finish_cast_row('catch', name, n, fight_s)
+    local lvl = fish_level(name)
+    finish_cast_row('catch', name, n, fight_s, lvl)
 
+    local lvtag = lvl and ('  Lv.' .. lvl) or ''
     local suffix = n > 1 and (' x' .. n) or ''
     if fight_s then
         suffix = suffix .. '  (' .. fight_s .. 's)'
     end
     if is_tracked(name) then
-        add_entry('♦', 'track', name .. suffix)
+        add_entry('♦', 'track', name .. lvtag .. suffix)
         play(settings.sound_tracked)
         msg('Tracked catch: ' .. name .. '!')
     else
-        add_entry('•', 'catch', name .. suffix)
+        add_entry('•', 'catch', name .. lvtag .. suffix)
     end
 end
 
@@ -1094,7 +1173,7 @@ local function on_status(old, new)
         finish_cast_row('unknown')
         local ok, items = pcall(windower.ffxi.get_items)
         if ok and items then
-            open_cast_row(get_equipped_item_id('range', items), get_equipped_item_id('ammo', items))
+            open_cast_row(get_equipped_item_id('range', items), get_equipped_item_id('ammo', items), items)
         else
             open_cast_row()
         end
@@ -1357,13 +1436,14 @@ end
 -------------------------------------------------------------------------------
 
 -- research CSV column positions. v1 rows end at fight_s, v2 added x/y/z/facing,
--- v3 added skillup - older rows simply have fewer trailing fields, so every
--- access below is nil-guarded rather than schema-switched.
+-- v3 added skillup, v4 added fish_level/buffs/gear/key_items - older rows simply
+-- have fewer trailing fields, so every access below is nil-guarded, not schema-switched.
 local COL = {
     contributor = 2, utc = 3, zone = 5, skill = 6, rod = 8, bait = 10,
     moon_phase = 12, vana_min = 13, vana_day = 14, weather_id = 15,
     outcome = 16, bite_id = 17, caught = 28, count = 29, fight_s = 30,
-    x = 31, y = 32, skillup = 35,
+    x = 31, y = 32, skillup = 35, fish_level = 36, buffs = 37, gear = 38,
+    key_items = 39,
 }
 
 local function split_csv(line)

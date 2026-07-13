@@ -2,7 +2,7 @@
 
 FishLog keeps a running log of your fishing on screen. FFXI only shows a couple of chat lines and your catches quickly scroll away into the rest of the spam, so FishLog puts every result in a small window you can drag wherever you like: what you caught, how long the fight took, misses, line and rod breaks, skill-ups, and monsters. It also tells you what's on your line before you reel it in.
 
-FishLog only watches, it never casts or reels for you, so it's safe to run whether you fish by hand or with a bot.
+FishLog only watches, it never casts or reels for you. It doesn't inject packets or automate anything, it simply reads the same chat and game data you already see, so it's safe to run alongside however you like to fish.
 
 ## Installing
 
@@ -14,7 +14,7 @@ FishLog only watches, it never casts or reels for you, so it's safe to run wheth
 
 ![The FishLog window](screenshot.png)
 
-- **History**: every catch, miss, lost catch, break, skill-up, and monster, each with a timestamp. Catches show how long the fight lasted.
+- **History**: every catch, miss, lost catch, break, skill-up, and monster, each with a timestamp. Catches show the fish's level and how long the fight lasted.
 - **On the line**: when something bites, FishLog names it before you land it, so you know whether it's the fish you want or a piece of junk.
 - **Monster warning**: if a monster grabs your line you get a red alert and a sound before you reel it into your face.
 - **Tracked catches**: `//fl track rusty` plays a chime and highlights the log whenever you catch anything with "rusty" in the name. Handy for quest or goal fishing while you watch something else.
