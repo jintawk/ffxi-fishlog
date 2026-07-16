@@ -17,6 +17,7 @@ FishLog only watches, it never casts or reels for you. It doesn't inject packets
 - **History**: every catch, miss, lost catch, break, skill-up, and monster, each with a timestamp. Catches show the fish's level and how long the fight lasted.
 - **On the line**: when something bites, FishLog names it before you land it, so you know whether it's the fish you want or a piece of junk.
 - **Monster warning**: if a monster grabs your line you get a red alert and a sound before you reel it into your face.
+- **Skill-up chime**: a jingle plays whenever your fishing skill rises, so you know a skill-up landed without watching the chat log.
 - **Tracked catches**: `//fl track rusty` plays a chime and highlights the log whenever you catch anything with "rusty" in the name. Handy for quest or goal fishing while you watch something else.
 - **Daily counter**: how many fish you've caught today toward the 200 per day fatigue limit, which resets at the same time as the game.
 - **Session stats**: casts, catch rate, fish per hour, skill gained, and breaks.
@@ -36,6 +37,7 @@ Use `//fishlog` or the short `//fl`.
 | `//fl lines <n>` | How many history rows to show |
 | `//fl compact` | Hide the history and show just the stats |
 | `//fl sound on/off` | Turn sounds on or off |
+| `//fl sound monster/skillup on/off` | Toggle just the monster or skill-up jingle |
 | `//fl help` | Full command list in game |
 
 Drag the window to move it. Scroll the mouse wheel over it to page back through older entries. Right-click toggles compact mode.
@@ -52,7 +54,7 @@ FishLog quietly records each cast so your `//fl stats` get better the more you f
 
 ## Sounds
 
-The chime and monster alarm are ordinary `.wav` files in the `sounds` folder. Swap in your own if you want different ones.
+The tracked chime, monster alarm, and skill-up jingle are ordinary `.wav` files in the `sounds` folder. Swap in your own if you want different ones.
 
 ## Credits
 

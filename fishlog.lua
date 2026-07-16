@@ -20,7 +20,7 @@ GNU General Public License for more details.
 
 _addon.name = 'FishLog'
 _addon.author = 'Jintawk'
-_addon.version = '1.4.1'
+_addon.version = '1.5.0'
 _addon.commands = {'fishlog', 'fl'}
 
 local bit = require('bit')
@@ -56,8 +56,10 @@ local defaults = {
     tracked = '',
     sound_enabled = true,
     sound_monster_enabled = true,
+    sound_skillup_enabled = true,
     sound_tracked = 'tracked',
     sound_monster = 'monster',
+    sound_skillup = 'skillup',
     debug = false,
     research = true,
     monster_command = '',
@@ -259,8 +261,8 @@ local GEAR_SLOTS = {'head', 'neck', 'ear1', 'ear2', 'body', 'hands',
 
 -- fishing-relevant key items (ids from res/key_items). The Moghancement /
 -- Moglification tiers are the active Mog House effect; the rest are the fishing
--- abilities and the skill-handling KI. Mog Garden fishing books and the Abyssea
--- angler atma are left out - they only affect Mog Garden / Abyssea fishing.
+-- abilities. Mog Garden fishing books and the Abyssea angler atma are left out -
+-- they only affect Mog Garden / Abyssea fishing.
 local FISH_KEY_ITEMS = {
     [523] = true, [534] = true,     -- Moghancement: Fishing
     [544] = true,                   -- Moglification: Fishing
@@ -269,7 +271,6 @@ local FISH_KEY_ITEMS = {
     [1977] = true,                  -- Serpent Rumors
     [1978] = true,                  -- Mooching
     [1979] = true,                  -- Anglers' Almanac
-    [2040] = true,                  -- Raw Fish Handling
     [2735] = true,                  -- Cheer: Baby Eft (Monster Rearing, Fishing skill +%)
 }
 
@@ -1026,6 +1027,9 @@ local function parse_line(text)
         end
         config.save(settings)
         add_entry('▲', 'skill', string.format('fishing skill +%.1f', v))
+        if settings.sound_skillup_enabled then
+            play(settings.sound_skillup)
+        end
         return
     end
 
@@ -2035,7 +2039,7 @@ local HELP = {
     '//fl untrack <name> / //fl tracked',
     '//fl lines <n>    history rows shown (3-25)',
     '//fl compact      hide history (right-click the window does this too)',
-    '//fl sound on|off all sounds; //fl sound monster on|off just the monster jingle',
+    '//fl sound on|off all sounds; //fl sound monster|skillup on|off just that jingle',
     '//fl today <n|+n|-n> correct the daily fatigue counter (no packet exists for it)',
     '//fl skill <n.n>  set the exact skill decimal (pins itself on +0.1 level-ups)',
     '//fl stats <fish> [in <zone>]  full where/when/how analysis of one species',
@@ -2120,6 +2124,10 @@ windower.register_event('addon command', function(command, ...)
             settings.sound_monster_enabled = state ~= 'off'
             config.save(settings)
             msg('Monster sound ' .. (settings.sound_monster_enabled and 'on.' or 'off.'))
+        elseif which == 'skillup' then
+            settings.sound_skillup_enabled = state ~= 'off'
+            config.save(settings)
+            msg('Skill-up sound ' .. (settings.sound_skillup_enabled and 'on.' or 'off.'))
         else
             settings.sound_enabled = args ~= 'off'
             config.save(settings)
