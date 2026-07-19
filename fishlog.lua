@@ -20,12 +20,16 @@ GNU General Public License for more details.
 
 _addon.name = 'FishLog'
 _addon.author = 'Jintawk'
-_addon.version = '1.5.0'
+_addon.version = '1.6.2'
 _addon.commands = {'fishlog', 'fl'}
 
 local bit = require('bit')
 local config = require('config')
-local slate = require('slate')
+-- Use the shared mythril lib in the dev tree; fall back to the bundled copy so
+-- a standalone clone of this addon works with no external dependencies.
+local has_shared, mythril = pcall(require, 'mythril')
+if not has_shared then mythril = require('mythril_bundled') end
+mythril.set_assets_path(windower.addon_path .. 'assets/')
 local res = require('resources')
 require('pack')
 
@@ -560,14 +564,14 @@ local function describe_identified(fishing_parameters)
 end
 
 -------------------------------------------------------------------------------
--- Rendering (Slate panel, libs/slate.lua)
+-- Rendering (Mythril panel, libs/mythril.lua)
 -------------------------------------------------------------------------------
 
 local UI_W  = 270
 local ROW_H = 17
 local DIV_H = 7
 
--- history entry color name -> slate token (filled in build_ui, after slate
+-- history entry color name -> mythril token (filled in build_ui, after mythril
 -- scale is set)
 local HIST_COLORS
 
@@ -590,25 +594,25 @@ local function build_ui()
         return
     end
     ui.built = true
-    slate.set_scale(tonumber(settings.ui.scale) or 1)
+    mythril.set_scale(tonumber(settings.ui.scale) or 1)
     HIST_COLORS = {
-        catch   = slate.color.ok,
-        track   = slate.color.accent,
-        miss    = slate.color.text_faint,
-        lost    = slate.color.warn,
-        brk     = slate.color.bad,
-        skill   = slate.color.warn,
-        monster = slate.color.bad,
-        info    = slate.color.text_dim,
-        value   = slate.color.text,
+        catch   = mythril.color.ok,
+        track   = mythril.color.accent,
+        miss    = mythril.color.text_faint,
+        lost    = mythril.color.warn,
+        brk     = mythril.color.bad,
+        skill   = mythril.color.warn,
+        monster = mythril.color.bad,
+        info    = mythril.color.text_dim,
+        value   = mythril.color.text,
     }
-    ui.panel = slate.Panel({
+    ui.panel = mythril.Panel({
         x = settings.display.pos.x,
         y = settings.display.pos.y,
         pos_source = function() return settings.display.pos.x, settings.display.pos.y end,
         w = UI_W,
         content_h = 60,
-        title = 'FISHLOG',
+        title = 'Fish Log',
         minimized = settings.ui.minimized,
         on_move = function(x, y)
             settings.display.pos.x = x
@@ -621,16 +625,16 @@ local function build_ui()
             render()
         end,
     })
-    ui.zone = ui.panel:add(slate.Label({size = 10, color = slate.color.text}), 10, 4)
-    ui.meta = ui.panel:add(slate.Label({size = 9, color = slate.color.text_dim}), 10, 4 + ROW_H)
+    ui.zone = ui.panel:add(mythril.Header({size = 10}), 10, 4)
+    ui.meta = ui.panel:add(mythril.Label({size = 9, color = mythril.color.text_dim}), 10, 4 + ROW_H)
     for i = 1, 3 do
-        ui.divs[i] = ui.panel:add(slate.Divider({w = UI_W - 20}), 10, 0)
+        ui.divs[i] = ui.panel:add(mythril.Divider({w = UI_W - 20}), 10, 0)
     end
-    ui.scrollind = ui.panel:add(slate.Label({size = 9, color = slate.color.text_dim}), 10, 0)
-    ui.status = ui.panel:add(slate.Label({size = 10, color = slate.color.text_dim}), 10, 0)
-    ui.foot1 = ui.panel:add(slate.Label({size = 9, color = slate.color.text_dim}), 10, 0)
-    ui.foot2 = ui.panel:add(slate.Label({size = 9, color = slate.color.text_dim}), 10, 0)
-    ui.histbox = ui.panel:add(slate.HitBox({
+    ui.scrollind = ui.panel:add(mythril.Label({size = 9, color = mythril.color.text_dim}), 10, 0)
+    ui.status = ui.panel:add(mythril.Label({size = 10, color = mythril.color.text_dim}), 10, 0)
+    ui.foot1 = ui.panel:add(mythril.Label({size = 9, color = mythril.color.text_dim}), 10, 0)
+    ui.foot2 = ui.panel:add(mythril.Label({size = 9, color = mythril.color.text_dim}), 10, 0)
+    ui.histbox = ui.panel:add(mythril.HitBox({
         w = UI_W, h = 10,
         on_scroll = function(delta)
             local max_offset = math.max(#history - settings.lines, 0)
@@ -652,8 +656,8 @@ end
 local function ensure_hist(n)
     for i = #ui.hist + 1, n do
         ui.hist[i] = {
-            ts  = ui.panel:add(slate.Label({size = 9, font = slate.font.mono, color = slate.color.text_faint}), 10, 0),
-            txt = ui.panel:add(slate.Label({size = 10, color = slate.color.text}), 68, 0),
+            ts  = ui.panel:add(mythril.Label({size = 9, font = mythril.font.mono, color = mythril.color.text_faint}), 10, 0),
+            txt = ui.panel:add(mythril.Label({size = 10, color = mythril.color.text}), 68, 0),
         }
     end
 end
@@ -734,7 +738,7 @@ render = function()
             local row = ui.hist[1]
             row.ts:text('')
             row.txt:text('cast a line to begin...')
-            row.txt:color(slate.color.text_faint)
+            row.txt:color(mythril.color.text_faint)
             ui.panel:place(row.ts, 10, y + 1)
             ui.panel:place(row.txt, 68, y)
             y = y + ROW_H
@@ -746,7 +750,7 @@ render = function()
                 local row = ui.hist[hist_used]
                 row.ts:text(e.ts)
                 row.txt:text(e.icon .. ' ' .. e.text)
-                row.txt:color(HIST_COLORS[e.color] or slate.color.text)
+                row.txt:color(HIST_COLORS[e.color] or mythril.color.text)
                 ui.panel:place(row.ts, 10, y + 1)
                 ui.panel:place(row.txt, 68, y)
                 y = y + ROW_H
@@ -772,19 +776,19 @@ render = function()
     if cast.hooked then
         if cast.monster then
             ui.status:text('MONSTER ON THE LINE!')
-            ui.status:color(slate.color.bad)
+            ui.status:color(mythril.color.bad)
         else
             local what = cast.senses or cast.names or 'something'
             local kind = cast.kind and ('  (' .. cast.kind .. ')') or ''
             ui.status:text('on line: ' .. what .. kind)
-            ui.status:color(slate.color.accent)
+            ui.status:color(mythril.color.accent)
         end
     elseif player_status == 56 then
         ui.status:text('line in the water...')
-        ui.status:color(slate.color.text_dim)
+        ui.status:color(mythril.color.text_dim)
     else
         ui.status:text('idle')
-        ui.status:color(slate.color.text_faint)
+        ui.status:color(mythril.color.text_faint)
     end
     ui.panel:place(ui.status, 10, y)
     y = y + ROW_H
@@ -905,8 +909,10 @@ local function parse_line(text)
         return
     end
     if text:find('verge of an epic catch', 1, true) then
+        -- visual only: the game already gives this away in the log, and the
+        -- jingle fires again on the catch itself if the fish is tracked, so
+        -- pinging on the warning too was just noise
         add_entry('♦', 'track', 'EPIC CATCH incoming!')
-        play(settings.sound_tracked)
         return
     end
 
@@ -1260,8 +1266,9 @@ windower.register_event('zone change', function(new_id)
     end
 end)
 
--- mouse interaction (wheel scroll, right-click compact toggle, drag,
--- minimize) is handled by the slate library via ui.histbox and the panel
+-- mouse interaction (wheel scroll, right-click compact toggle, drag from
+-- anywhere on the window, and click-the-title to minimize) is handled by the
+-- mythril library via ui.histbox and the panel
 
 local function init()
     local player = windower.ffxi.get_player()
@@ -2052,7 +2059,7 @@ local HELP = {
 }
 
 windower.register_event('addon command', function(command, ...)
-    if slate.handle_command(command, ...) then
+    if mythril.handle_command(command, ...) then
         return
     end
     command = command and command:lower() or 'toggle'
@@ -2063,7 +2070,7 @@ windower.register_event('addon command', function(command, ...)
         if n and n >= 0.5 and n <= 3 then
             settings.ui.scale = n
             config.save(settings)
-            slate.set_scale(n)
+            mythril.set_scale(n)
             render()
             msg(string.format('HUD scale set to %g.', n))
         else
